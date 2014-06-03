@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:mvc="http://www.springframework.org/schema/mvc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop" xmlns:security="http://www.springframework.org/schema/security"
+
+
+	xsi:schemaLocation="  http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context-4.0.xsd
+         http://www.springframework.org/schema/tx
+		http://www.springframework.org/schema/tx/spring-tx-4.0.xsd              
+                http://www.springframework.org/schema/mvc
+        http://www.springframework.org/schema/mvc/spring-mvc-4.0.xsd
+        		http://www.springframework.org/schema/aop
+		http://www.springframework.org/schema/aop/spring-aop-4.0.xsd
+        http://www.springframework.org/schema/security
+        http://www.springframework.org/schema/security/spring-security-3.2.xsd">
+
+	<bean
+		class='org.springframework.beans.factory.config.PropertyPlaceholderConfigurer'>
+		<property name='location'>
+			<value>classpath:environment.properties</value>
+		</property>
+	</bean>
+
+	<!-- Scan classpath for components, including our Social Security Configuration 
+		class -->
+		
+	<context:component-scan base-package="org.socialsignin.springsocial.security.config.social" >
+	</context:component-scan>
+	
+	<context:component-scan base-package="org.socialsignin.springsocial.security" >
+	</context:component-scan>
+	
+	
+	<context:component-scan base-package="org.socialsignin.provider" />
+
+
+	<!-- End Spring Social Security -->
+
+	<!-- Start Spring Security -->
+
+	<security:global-method-security
+		proxy-target-class="false" >
+	</security:global-method-security>
+
+
+	<security:authentication-manager alias="authenticationManager">
+	</security:authentication-manager>
+
+
+	<bean id="accessDecisionManager" class="org.springframework.security.access.vote.UnanimousBased"
+		xmlns="http://www.springframework.org/schema/beans">
+		<constructor-arg>
+			<list>
+				<bean class="org.springframework.security.access.vote.RoleVoter" />
+				<bean class="org.springframework.security.access.vote.AuthenticatedVoter" />
+			</list>
+		</constructor-arg>
+	</bean>
+
+	<security:http use-expressions="true"
+		entry-point-ref="springSocialSecurityEntryPoint" xmlns="http://www.springframework.org/schema/security">
+
+		<intercept-url pattern="/protected/twitter" access="hasRole('ROLE_USER_TWITTER')" />
+		<intercept-url pattern="/protected/facebook" access="hasRole('ROLE_USER_FACEBOOK')" />
+		<intercept-url pattern="/protected/facebookTwitter" access="hasRole('ROLE_USER_FACEBOOK') and hasRole('ROLE_USER_TWITTER')" />
+		<intercept-url pattern="/protected/**" access="hasRole('ROLE_USER')" />
+		
+		<intercept-url pattern="/oauthconnect.jsp" access="hasRole('ROLE_USER')" />
+
+        <access-denied-handler ref="springSocialSecurityAccessDeniedHandler"/>
+
+
+		<security:logout logout-url="/logout" />
+		
+		<anonymous />
+		<security:custom-filter position="FORM_LOGIN_FILTER"
+			ref="springSocialSecurityAuthenticationFilter" />
+
+		<remember-me services-ref="springSocialSecurityRememberMeServices"
+			key="springSocialSecurity" />
+
+	</security:http>
+
+	
+	<bean id="springSocialSecurityEntryPoint"
+  		class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
+ 		<property name="loginFormUrl" value="/oauthlogin.jsp"/>
+	</bean>
+	
+
+	<bean id="springSocialSecurityRememberMeServices"
+		class="org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices">
+		<property name="userDetailsService" ref="springSocialSecurityUserDetailsService" />
+		<property name="tokenRepository" ref="tokenRepository" />
+		<property name="key" value="springSocialSecurity" />
+		<property name="alwaysRemember" value="true" />
+		<property name="tokenValiditySeconds" value="3600" />
+	</bean>
+
+
+	<bean id="tokenRepository"
+		class="org.springframework.security.web.authentication.rememberme.JdbcTokenRepositoryImpl">
+		<property name="createTableOnStartup" value="true" />
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	<!-- End Spring Security -->
+
+
+	<!-- Start Spring Social -->
+	
+ 	<!-- Transaction manager for a single JDBC DataSource -->
+
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource"><ref bean="dataSource"/></property>
+	</bean>
+
+
+	<bean class="org.springframework.social.connect.web.ProviderSignInController">
+		<constructor-arg value="${application.secureUrl}" />
+		<property name="signUpUrl" value="/signup" />
+		<property name="postSignInUrl" value="/authenticate" />
+
+		<!-- relies on by-type autowiring for the other constructor-args -->
+	</bean>
+
+	<bean class="org.springframework.social.connect.web.ConnectController">
+		<!-- relies on by-type autowiring for the constructor-args -->
+		<property name="interceptors" ref="connectInterceptorList">
+		</property>
+	</bean>
+
+	<!--  
+	<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource"
+		destroy-method="close">
+		<property name="driverClassName">
+			<value>org.hsqldb.jdbcDriver</value>
+		</property>
+		<property name="url">
+			<value>jdbc:hsqldb:mem:socialsignin</value>
+		</property>
+		<property name="username">
+			<value>sa</value>
+		</property>
+		<property name="password">
+			<value></value>
+		</property>
+		<property name="defaultAutoCommit">
+			<value>true</value>
+		</property>
+	</bean>
+	-->
+	<bean id="textEncryptor" class="org.springframework.security.crypto.encrypt.Encryptors"
+		factory-method="noOpText" />
+
+	<!-- End Spring Social -->
+
+</beans>
